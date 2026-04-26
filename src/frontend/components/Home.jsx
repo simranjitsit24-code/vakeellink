@@ -19,8 +19,8 @@ const Home = () => {
       <section className="px-6 py-12 md:py-20 max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row items-center gap-12">
           <div className="flex-1 space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/5 text-blue-600 text-sm font-semibold border border-blue-500/10">
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-100 text-green-800 text-sm font-semibold border border-green-200">
+              <span className="w-2 h-2 rounded-full bg-green-600 animate-pulse"></span>
               AI-POWERED LEGAL ACCESS
             </div>
             <h1 className="text-5xl md:text-7xl font-black tracking-tight text-black leading-[1.1]">
