@@ -31,10 +31,10 @@ const NavBar = () => {
 
       {/* Action Button */}
       <div className="flex items-center gap-4">
-        <button className="hidden sm:block text-gray-600 font-medium hover:text-blue-600 px-4 py-2">Log In</button>
-        <button className="bg-gray-900 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-blue-600 transition-all shadow-lg shadow-gray-900/10 active:scale-95">
+        <Link to="/login" className="hidden sm:block text-gray-600 font-medium hover:text-blue-600 px-4 py-2">Log In</Link>
+        <Link to="/login" className="bg-gray-900 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-blue-600 transition-all shadow-lg shadow-gray-900/10 active:scale-95">
           Get Started
-        </button>
+        </Link>
       </div>
     </nav>
   );
