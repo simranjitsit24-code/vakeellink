@@ -20,21 +20,25 @@ DOMAIN_KEYWORDS = {
         "secondary": ["dignity", "equality", "constitution"]
     },
     "legal_criminal": {
-        "primary": ["bail", "fir", "ipc", "crpc", "murder", "theft", "arrest", "custody"],
+        "primary": ["bail", "fir", "ipc", "crpc", "murder", "theft", "arrest", "custody",
+                    "cheque bounce", "section 138", "negotiable instruments", "dishonour",
+                    "cybercrime", "it act", "section 66", "498a", "cruelty", "dowry"],
         "secondary": ["offence", "accused", "criminal"]
     },
     "legal_labour": {
-        "primary": ["employment", "wages", "workmen", "labour court", "retrenchment"],
+        "primary": ["employment", "wages", "workmen", "labour court", "retrenchment", 
+                    "industrial disputes", "posh act", "sexual harassment", "maternity benefit"],
         "secondary": ["worker", "employer", "compensation"]
     },
     "legal_consumer": {
         "primary": ["consumer complaint", "deficiency of service", "ncdrc", 
-                    "district forum", "consumer court", "consumer protection"],
+                    "district forum", "consumer court", "consumer protection",
+                    "rera", "possession delay", "medical negligence", "flight cancellation", "online refund"],
         "secondary": ["insurance", "refund", "manufacturer", "service provider"]
     },
     "legal_motor_accident": {
         "primary": ["motor accident", "mact", "hit and run", "vehicle collision",
-                    "motor vehicle", "accident claim", "motor insurance"],
+                    "motor vehicle", "accident claim", "motor insurance", "compensation multiplier", "loss of income"],
         "secondary": ["tribunal", "compensation", "rash driving"]
     },
     "legal_family": {
@@ -43,38 +47,73 @@ DOMAIN_KEYWORDS = {
     }
 }
 
-def classify_domain(query: str) -> List[str]:
-    query_lower = query.lower()
-    domain_scores = {}
-    
-    for domain, keywords in DOMAIN_KEYWORDS.items():
-        score = 0
-        score += sum(3 for kw in keywords["primary"] if kw in query_lower)    # primary = 3pts
-        score += sum(1 for kw in keywords["secondary"] if kw in query_lower)  # secondary = 1pt
-        if score > 0:
-            domain_scores[domain] = score
-    
-    if not domain_scores:
-        return list(DOMAIN_KEYWORDS.keys())  # fallback: search all
-    
-    max_score = max(domain_scores.values())
-    # Only return domains within 3 points of the top score
-    return [d for d, s in domain_scores.items() if s >= max_score - 3]
+DOMAIN_DESCRIPTIONS = {
+    "legal_constitutional": "fundamental rights constitution article writ",
+    "legal_criminal": "crime bail arrest FIR punishment offence",
+    "legal_consumer": "consumer complaint deficiency service product",
+    "legal_family": "marriage divorce custody maintenance family",
+    "legal_labour": "employment wages worker termination labour",
+    "legal_motor_accident": "accident vehicle compensation motor MACT"
+}
+
+DOMAIN_PRIORITY = [
+    "legal_constitutional", 
+    "legal_criminal",
+    "legal_consumer", 
+    "legal_family",
+    "legal_labour",
+    "legal_motor_accident"
+]
 
 # ─────────────────────────────────────────────
 # RETRIEVAL ENGINE
 # ─────────────────────────────────────────────
+from numpy.linalg import norm
+def cosine_similarity(a, b):
+    return np.dot(a, b) / (norm(a) * norm(b))
+
 class LegalRetriever:
     def __init__(self):
         self.client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
         self.model = SentenceTransformer(MODEL_NAME)
         
+    def classify_domain(self, query: str) -> List[str]:
+        query_lower = query.lower()
+        domain_scores = {}
+        
+        for domain, keywords in DOMAIN_KEYWORDS.items():
+            score = 0
+            score += sum(3 for kw in keywords["primary"] if kw in query_lower)    # primary = 3pts
+            score += sum(1 for kw in keywords["secondary"] if kw in query_lower)  # secondary = 1pt
+            if score > 0:
+                domain_scores[domain] = score
+        
+        if not domain_scores:
+            query_embedding = self.model.encode(query)
+            best_domain = max(
+                DOMAIN_DESCRIPTIONS.keys(),
+                key=lambda d: cosine_similarity(
+                    query_embedding, 
+                    self.model.encode(DOMAIN_DESCRIPTIONS[d])
+                )
+            )
+            return [best_domain]
+        
+        max_score = max(domain_scores.values())
+        matched_domains = [d for d, s in domain_scores.items() if s >= max_score - 3]
+        
+        if len(matched_domains) <= 1:
+            return matched_domains
+            
+        matched_domains.sort(key=lambda d: DOMAIN_PRIORITY.index(d) if d in DOMAIN_PRIORITY else 99)
+        return matched_domains[:2]
+
     def search(self, query: str, top_k: int = 5, score_threshold: float = 0.35):
         import re
         print(f"\n[QUERY] {query}")
         
         # 1. Classify
-        target_collections = classify_domain(query)
+        target_collections = self.classify_domain(query)
         print(f"[DOMAINS] {target_collections}")
         
         # 2. Embed

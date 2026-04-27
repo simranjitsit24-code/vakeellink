@@ -13,9 +13,9 @@ API_KEY      = "467212a79c8fa202e600c963e3def90fb964094d"
 OUTPUT_DIR   = Path("corpus")
 DELAY_MIN    = 1.5
 DELAY_MAX    = 3.0
-CHUNK_SIZE   = 400
+CHUNK_SIZE   = 450
 CHUNK_OVERLAP= 50
-MIN_WORDS    = 60
+MIN_CHARS    = 100
 
 # ── FIX 1: Per-subdomain caps (was hardcoded 800 everywhere) ──────────────────
 SUBDOMAIN_CAPS = {
@@ -584,27 +584,28 @@ def score_authority(cited_by: int, court_type: str) -> str:
 # ── CHUNKER ───────────────────────────────────────────────────────────────────
 
 def chunk_text(text: str) -> list[str]:
-    paras = re.split(r"\n\s*\n", text)
-    chunks, buf, buf_words = [], [], 0
-    overlap_paras = max(1, CHUNK_OVERLAP // 25)
+    # Chunking by characters instead of words
+    paras = text.split("\n")
+    chunks, buf, buf_chars = [], [], 0
+    overlap_paras = max(1, CHUNK_OVERLAP // 50)
 
     for para in paras:
         para = para.strip()
         if not para:
             continue
-        w = len(para.split())
-        if buf_words + w > CHUNK_SIZE and buf:
+        c = len(para)
+        if buf_chars + c > CHUNK_SIZE and buf:
             candidate = " ".join(buf)
-            if len(candidate.split()) >= MIN_WORDS:
+            if len(candidate) >= MIN_CHARS:
                 chunks.append(candidate)
             buf = buf[-overlap_paras:] if len(buf) >= overlap_paras else buf
-            buf_words = sum(len(b.split()) for b in buf)
+            buf_chars = sum(len(b) for b in buf)
         buf.append(para)
-        buf_words += w
+        buf_chars += c
 
     if buf:
         candidate = " ".join(buf)
-        if len(candidate.split()) >= MIN_WORDS:
+        if len(candidate) >= MIN_CHARS:
             chunks.append(candidate)
 
     return chunks
