@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 import json
-from semantic_search import LegalSearchEngine
+from scripts.search.semantic_search import LegalSearchEngine
 
 # Set page config for a premium look
 st.set_page_config(
@@ -124,7 +124,10 @@ st.markdown("""
 # Load engine once
 @st.cache_resource
 def load_engine():
-    return LegalSearchEngine()
+    return LegalSearchEngine(
+        embeddings_dir='data/embeddings',
+        processed_dir='data/processed_data'
+    )
 
 engine = load_engine()
 
