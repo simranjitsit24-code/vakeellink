@@ -23,6 +23,47 @@ dist-ssr
 *.sln
 *.sw?
 
+# Environment files — NEVER commit secrets
+.env
+.env.*
+.env.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
+.env.production
+.env.production.local
+.env.staging
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+ENV/
+.venv/
+*.egg-info/
+dist/
+build/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Large data directories — generate locally, do NOT push to GitHub
+corpus/
+processed_corpus/
+processed_data/
+enriched_corpus/
+embeddings/
+
 # Local files
 hi.py
-.env 
