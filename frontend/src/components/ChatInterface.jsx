@@ -1,12 +1,82 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Sparkles, Loader2, Paperclip, Mic, ExternalLink, Quote } from 'lucide-react';
+import { Send, Bot, User, Sparkles, Loader2, Paperclip, Mic, ExternalLink, Quote, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../lib/utils';
 import { legalSearch } from '../services/api';
 
+const Modal = ({ isOpen, onClose, title, content, metadata }) => {
+  if (!isOpen) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.95, opacity: 0, y: 20 }}
+          className="bg-card border border-border w-full max-w-2xl max-h-[80vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between p-6 border-b border-border">
+            <div>
+              <h3 className="text-xl font-bold text-primary">{title}</h3>
+              <p className="text-xs text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
+                {metadata?.domain || 'Legal Document'} • {metadata?.year || 'N/A'}
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-muted rounded-full transition-colors"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            <div className="space-y-2">
+              <h4 className="text-sm font-bold uppercase tracking-tight text-muted-foreground">Legal Issue</h4>
+              <p className="text-sm leading-relaxed">{metadata?.legal_issue || 'No specific issue listed.'}</p>
+            </div>
+            
+            <div className="space-y-2">
+              <h4 className="text-sm font-bold uppercase tracking-tight text-muted-foreground">Acts & Sections</h4>
+              <p className="text-sm leading-relaxed font-mono bg-muted/50 p-2 rounded border border-border">
+                {metadata?.acts || 'N/A'} | {metadata?.sections || 'N/A'}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <h4 className="text-sm font-bold uppercase tracking-tight text-muted-foreground">Full Content</h4>
+              <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90 bg-muted/20 p-4 rounded-xl border border-border/50">
+                {content}
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 border-t border-border bg-muted/30 flex justify-end">
+            <button
+              onClick={onClose}
+              className="px-6 py-2 bg-primary text-primary-foreground font-bold rounded-xl hover:opacity-90 transition-all"
+            >
+              Close Document
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+};
+
 const ChatInterface = () => {
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedChunk, setSelectedChunk] = useState(null);
   const [messages, setMessages] = useState([
     { 
       id: 1, 
@@ -26,13 +96,14 @@ const ChatInterface = () => {
     scrollToBottom();
   }, [messages]);
 
-  const handleSearch = async () => {
-    if (!query.trim() || isLoading) return;
+  const handleSearch = async (forcedQuery = null) => {
+    const searchQuery = forcedQuery || query;
+    if (!searchQuery.trim() || isLoading) return;
     
     const userMessage = { 
       id: Date.now(), 
       type: 'user', 
-      text: query,
+      text: searchQuery,
       timestamp: new Date()
     };
     
@@ -41,7 +112,7 @@ const ChatInterface = () => {
     setIsLoading(true);
     
     try {
-      const data = await legalSearch(query);
+      const data = await legalSearch(searchQuery);
       
       const aiResponse = { 
         id: Date.now() + 1, 
@@ -63,6 +134,12 @@ const ChatInterface = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleTagClick = (tag) => {
+    setQuery(tag);
+    // Optionally trigger search immediately
+    // handleSearch(tag);
   };
 
   return (
@@ -113,7 +190,7 @@ const ChatInterface = () => {
                       <div key={idx} className="p-3 bg-muted/30 border border-border rounded-xl text-xs hover:bg-muted/50 transition-colors group">
                         <div className="flex items-center justify-between mb-1">
                           <span className="font-bold text-primary truncate max-w-[200px]">
-                            {chunk.metadata?.law_name || chunk.metadata?.source || 'Legal Document'}
+                            {chunk.metadata?.source || 'Legal Document'}
                           </span>
                           <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-mono">
                             Match: {(chunk.score * 100).toFixed(0)}%
@@ -121,7 +198,10 @@ const ChatInterface = () => {
                         </div>
                         <p className="text-muted-foreground line-clamp-2 italic">"{chunk.text}"</p>
                         <div className="mt-2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button className="text-[10px] font-bold text-primary flex items-center gap-1">
+                          <button 
+                            onClick={() => setSelectedChunk(chunk)}
+                            className="text-[10px] font-bold text-primary flex items-center gap-1 hover:underline"
+                          >
                             View Full Text <ExternalLink size={10} />
                           </button>
                         </div>
@@ -166,7 +246,11 @@ const ChatInterface = () => {
               <div className="h-4 w-px bg-border mx-2" />
               <div className="flex gap-2 overflow-x-auto scrollbar-hide">
                 {['Legal Advice', 'Case Search', 'Statutes', 'Property', 'Criminal'].map(tag => (
-                  <button key={tag} className="text-[10px] whitespace-nowrap font-semibold uppercase tracking-wider px-2 py-0.5 bg-muted rounded hover:bg-primary/10 hover:text-primary transition-colors">
+                  <button 
+                    key={tag} 
+                    onClick={() => handleTagClick(tag)}
+                    className="text-[10px] whitespace-nowrap font-semibold uppercase tracking-wider px-2 py-0.5 bg-muted rounded hover:bg-primary/10 hover:text-primary transition-colors"
+                  >
                     {tag}
                   </button>
                 ))}
@@ -192,7 +276,7 @@ const ChatInterface = () => {
                   <Mic size={18} />
                 </button>
                 <button 
-                  onClick={handleSearch}
+                  onClick={() => handleSearch()}
                   disabled={!query.trim() || isLoading}
                   className={cn(
                     "p-2 rounded-xl transition-all",
@@ -211,6 +295,15 @@ const ChatInterface = () => {
           </p>
         </div>
       </div>
+
+      {/* Document Modal */}
+      <Modal
+        isOpen={!!selectedChunk}
+        onClose={() => setSelectedChunk(null)}
+        title={selectedChunk?.metadata?.source || 'Legal Document'}
+        content={selectedChunk?.text}
+        metadata={selectedChunk?.metadata}
+      />
     </div>
   );
 };
