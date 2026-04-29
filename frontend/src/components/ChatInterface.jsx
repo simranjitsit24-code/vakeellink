@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Sparkles, Loader2, Paperclip, Mic } from 'lucide-react';
+import { Send, Bot, User, Sparkles, Loader2, Paperclip, Mic, ExternalLink, Quote } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../lib/utils';
+import { legalSearch } from '../services/api';
 
 const ChatInterface = () => {
   const [query, setQuery] = useState('');
@@ -39,23 +40,35 @@ const ChatInterface = () => {
     setQuery('');
     setIsLoading(true);
     
-    // Simulate AI response for now
-    setTimeout(() => {
+    try {
+      const data = await legalSearch(query);
+      
       const aiResponse = { 
         id: Date.now() + 1, 
         type: 'ai', 
-        text: "Based on the Indian Penal Code and recent Supreme Court judgments, the matter you've described falls under Section 420 (Cheating). In 'State of Haryana v. Bhajan Lal', the court established guidelines for quashing such FIRs if the allegations don't constitute an offense. Would you like me to find specific precedents or draft a summary?",
+        text: data.answer,
+        chunks: data.chunks,
         timestamp: new Date()
       };
+      
       setMessages(prev => [...prev, aiResponse]);
+    } catch (error) {
+      setMessages(prev => [...prev, {
+        id: Date.now() + 1,
+        type: 'ai',
+        text: "I encountered an error while searching the legal database. Please ensure the backend server is running and try again.",
+        timestamp: new Date(),
+        isError: true
+      }]);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (
     <div className="flex flex-col h-full max-w-4xl mx-auto relative">
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto pb-32 pt-4 space-y-6 scrollbar-hide">
+      <div className="flex-1 overflow-y-auto pb-32 pt-4 space-y-6 scrollbar-hide px-2">
         <AnimatePresence initial={false}>
           {messages.map((msg) => (
             <motion.div
@@ -74,19 +87,48 @@ const ChatInterface = () => {
                 {msg.type === 'ai' ? <Bot size={18} /> : <User size={18} />}
               </div>
               
-              <div className={cn(
-                "max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm",
-                msg.type === 'ai' 
-                  ? "bg-card border border-border text-foreground rounded-tl-none" 
-                  : "bg-primary text-primary-foreground rounded-tr-none"
-              )}>
-                {msg.text}
+              <div className="max-w-[85%] space-y-2">
                 <div className={cn(
-                  "text-[10px] mt-2 opacity-50",
-                  msg.type === 'user' ? "text-right" : "text-left"
+                  "rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm",
+                  msg.type === 'ai' 
+                    ? cn("bg-card border border-border text-foreground rounded-tl-none", msg.isError && "border-destructive/50 text-destructive") 
+                    : "bg-primary text-primary-foreground rounded-tr-none"
                 )}>
-                  {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  <div className="whitespace-pre-wrap">{msg.text}</div>
+                  <div className={cn(
+                    "text-[10px] mt-2 opacity-50",
+                    msg.type === 'user' ? "text-right" : "text-left"
+                  )}>
+                    {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
                 </div>
+
+                {/* Citations/Sources */}
+                {msg.chunks && msg.chunks.length > 0 && (
+                  <div className="grid grid-cols-1 gap-2 mt-2">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1 px-2">
+                      <Quote size={10} /> Legal Sources & Citations
+                    </p>
+                    {msg.chunks.map((chunk, idx) => (
+                      <div key={idx} className="p-3 bg-muted/30 border border-border rounded-xl text-xs hover:bg-muted/50 transition-colors group">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-bold text-primary truncate max-w-[200px]">
+                            {chunk.metadata?.law_name || chunk.metadata?.source || 'Legal Document'}
+                          </span>
+                          <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-mono">
+                            Match: {(chunk.score * 100).toFixed(0)}%
+                          </span>
+                        </div>
+                        <p className="text-muted-foreground line-clamp-2 italic">"{chunk.text}"</p>
+                        <div className="mt-2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button className="text-[10px] font-bold text-primary flex items-center gap-1">
+                            View Full Text <ExternalLink size={10} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </motion.div>
           ))}
@@ -122,9 +164,9 @@ const ChatInterface = () => {
                 <Paperclip size={16} />
               </button>
               <div className="h-4 w-px bg-border mx-2" />
-              <div className="flex gap-2">
-                {['Legal Advice', 'Case Search', 'Statutes'].map(tag => (
-                  <button key={tag} className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 bg-muted rounded hover:bg-primary/10 hover:text-primary transition-colors">
+              <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+                {['Legal Advice', 'Case Search', 'Statutes', 'Property', 'Criminal'].map(tag => (
+                  <button key={tag} className="text-[10px] whitespace-nowrap font-semibold uppercase tracking-wider px-2 py-0.5 bg-muted rounded hover:bg-primary/10 hover:text-primary transition-colors">
                     {tag}
                   </button>
                 ))}
@@ -159,7 +201,7 @@ const ChatInterface = () => {
                       : "bg-muted text-muted-foreground"
                   )}
                 >
-                  <Send size={18} />
+                  {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
                 </button>
               </div>
             </div>
